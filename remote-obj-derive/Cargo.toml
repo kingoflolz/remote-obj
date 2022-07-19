@@ -1,0 +1,16 @@
+[package]
+name = "remote-obj-derive"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+[dependencies]
+darling = "0.13.1"
+proc-macro2 = "1"
+quote = "1.0.14"
+syn = { version = "1.0.84", features = ["full"] }
+
+[lib]
+proc-macro = true
