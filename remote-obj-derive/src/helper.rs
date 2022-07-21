@@ -1,47 +1,56 @@
 use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
-use syn::{Expr, ExprMethodCall, ExprField, Member, ExprPath};
+use syn::{Expr, token, bracketed};
 
 extern crate proc_macro2;
 
+#[derive(Debug)]
+enum IdentOrIndex {
+    Field(Ident),
+    Variant(Ident),
+    Index(Expr),
+}
+
 pub(crate) struct Setter {
-    path: Vec<Ident>,
+    path: Vec<IdentOrIndex>,
     base_type: Ident,
-    expr: Expr
+    expr: Option<Expr>
 }
 
 impl Parse for Setter {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let assign = input.parse::<ExprMethodCall>()?;
-
+        let base_type = input.parse::<Ident>()?;
         let mut path = Vec::new();
-        let expr;
+        let mut expr = None;
 
-        let ExprMethodCall{receiver, method, args, ..} = assign;
-        path.push(method.clone());
-
-        let mut partial = receiver.clone();
-        loop {
-            match &*partial {
-                Expr::Field(ExprField{base, member: Member::Named(ident), ..}) => {
-                    path.push(ident.clone());
-
-                    partial = base.clone();
-                }
-                Expr::Path(ExprPath{path: p, ..}) => {
-                    path.extend(p.segments.iter().rev().map(|s| s.ident.clone()));
-                    break
-                }
-                _ => break
+        while !input.is_empty() {
+            let lookahead = input.lookahead1();
+            if lookahead.peek(syn::Token![.]) {
+                input.parse::<syn::Token![.]>()?;
+                path.push(IdentOrIndex::Field(input.parse::<Ident>()?));
+            } else if lookahead.peek(syn::Token![::]) {
+                input.parse::<syn::Token![::]>()?;
+                path.push(IdentOrIndex::Variant(input.parse::<Ident>()?));
+            } else if lookahead.peek(token::Bracket) {
+                let content;
+                bracketed!(content in input);
+                path.push(IdentOrIndex::Index(content.parse::<Expr>()?));
+            } else if lookahead.peek(syn::Token![=]) {
+                input.parse::<syn::Token![=]>()?;
+                expr = Some(input.parse::<Expr>()?);
+                break;
+            } else {
+                return Err(lookahead.error())
             }
         }
-        assert_eq!(args.len(), 1);
 
-        expr = args.first().unwrap().clone();
-
-        let base_type = path.pop().unwrap();
-        path.reverse();
+        if expr.is_none() {
+            match path.last().unwrap() {
+                IdentOrIndex::Variant(_) => {},
+                _ => return Err(input.error("expected `=`"))
+            }
+        }
 
         Ok(Setter {
             path,
@@ -56,12 +65,31 @@ impl ToTokens for Setter {
         let base_setter_type = format_ident!("{}Setter", self.base_type);
         let expr = self.expr.clone();
 
-        let mut partial = quote!{#expr};
+        let mut partial;
+        match expr {
+            None => {
+                partial = quote!{()};
+            }
+            Some(expr) => {
+                partial = quote!{#expr};
+            }
+        }
+
         for i in self.path.iter().rev() {
-            let i = format_ident!("make_{}", i);
-            partial = quote! {
-                x.#i(|x| #partial)
-            };
+            match i {
+                IdentOrIndex::Field(i) | IdentOrIndex::Variant(i) => {
+                    let i = format_ident!("make_{}", i);
+                    partial = quote! {
+                        x.#i(|x| #partial)
+                    };
+                }
+                IdentOrIndex::Index(i) => {
+                    partial = quote! {
+                        x.arr_set(#i, |x| #partial)
+                    };
+                }
+            }
+
         }
 
         tokens.extend(quote! {
@@ -74,37 +102,31 @@ impl ToTokens for Setter {
 }
 
 pub(crate) struct Getter {
-    path: Vec<Ident>,
+    path: Vec<IdentOrIndex>,
     base_type: Ident,
 }
 
 impl Parse for Getter {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let assign = input.parse::<ExprMethodCall>()?;
-
+        let base_type = input.parse::<Ident>()?;
         let mut path = Vec::new();
 
-        let ExprMethodCall{receiver, method, ..} = assign;
-        path.push(method.clone());
-
-        let mut partial = receiver.clone();
-        loop {
-            match &*partial {
-                Expr::Field(ExprField{base, member: Member::Named(ident), ..}) => {
-                    path.push(ident.clone());
-
-                    partial = base.clone();
-                }
-                Expr::Path(ExprPath{path: p, ..}) => {
-                    path.extend(p.segments.iter().rev().map(|s| s.ident.clone()));
-                    break
-                }
-                _ => break
+        while !input.is_empty() {
+            let lookahead = input.lookahead1();
+            if lookahead.peek(syn::Token![.]) {
+                input.parse::<syn::Token![.]>()?;
+                path.push(IdentOrIndex::Field(input.parse::<Ident>()?));
+            } else if lookahead.peek(syn::Token![::]) {
+                input.parse::<syn::Token![::]>()?;
+                path.push(IdentOrIndex::Variant(input.parse::<Ident>()?));
+            } else if lookahead.peek(token::Bracket) {
+                let content;
+                bracketed!(content in input);
+                path.push(IdentOrIndex::Index(content.parse::<Expr>()?));
+            } else {
+                return Err(lookahead.error())
             }
         }
-
-        let base_type = path.pop().unwrap();
-        path.reverse();
 
         Ok(Getter {
             path,
@@ -115,19 +137,29 @@ impl Parse for Getter {
 
 impl ToTokens for Getter {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
-        let base_setter_type = format_ident!("{}Getter", self.base_type);
+        let base_getter_type = format_ident!("{}Getter", self.base_type);
 
-        let mut partial = quote!{ () };
+        let mut partial = quote!{()};
         for i in self.path.iter().rev() {
-            let i = format_ident!("make_{}", i);
-            partial = quote! {
-                x.#i(|x| #partial)
-            };
+            match i {
+                IdentOrIndex::Field(i) | IdentOrIndex::Variant(i) => {
+                    let i = format_ident!("make_{}", i);
+                    partial = quote! {
+                        x.#i(|x| #partial)
+                    };
+                }
+                IdentOrIndex::Index(i) => {
+                    partial = quote! {
+                        x.arr_get(#i, |x| #partial)
+                    };
+                }
+            }
+
         }
 
         tokens.extend(quote! {
             {
-                let x = #base_setter_type::default();
+                let x = #base_getter_type::default();
                 #partial
             }
         })
