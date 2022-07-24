@@ -1,16 +1,19 @@
 use darling::{ast::Data, FromDeriveInput, FromField, FromVariant};
 use darling::ast::Fields;
+use darling::util::PathList;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{Generics, Ident, Type, Visibility};
 
 #[derive(FromDeriveInput)]
-#[darling(supports(struct_named, enum_any))]
+#[darling(supports(struct_named, enum_any), forward_attrs(derive), attributes(remote))]
 pub(crate) struct Receiver {
     ident: Ident,
     generics: Generics,
     data: Data<ReceiverVariant, ReceiverField>,
-    vis: Visibility
+    vis: Visibility,
+    #[darling(default)]
+    derive: PathList,
 }
 
 impl ToTokens for Receiver {
@@ -61,10 +64,12 @@ impl Receiver {
             format_ident!("make_{}", field.ident.unwrap())
         }).collect();
         let vis = &self.vis;
+        let inner_derives = &self.derive;
 
         tokens.extend(quote! {
             #[automatically_derived]
             #[derive(Default)]
+            #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #setter_enum_ident {
                 #(#names(<#types as Setter>::SetterType),)*
@@ -179,10 +184,12 @@ impl Receiver {
         let newtype_types = self.newtype_types();
 
         let vis = &self.vis;
+        let inner_derives = &self.derive;
 
         tokens.extend(quote! {
             #[automatically_derived]
             #[derive(Default)]
+            #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #setter_enum_ident {
                 #(#unit_variants,)*
