@@ -5,7 +5,7 @@ use quote::{format_ident, quote, ToTokens};
 use syn::{Generics, Ident, Type, Visibility};
 
 #[derive(FromDeriveInput)]
-#[darling(supports(struct_named, enum_any))]
+#[darling(supports(struct_named, enum_any), forward_attrs(derive), attributes(remote))]
 pub(crate) struct Receiver {
     ident: Ident,
     generics: Generics,
