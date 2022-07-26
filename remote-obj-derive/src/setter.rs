@@ -90,7 +90,7 @@ impl Receiver {
             impl #impl_generics Setter for #ident #ty_generics #where_clause {
                 type SetterType = #setter_enum_ident #ty_generics;
 
-                fn set(&mut self, x: #setter_enum_ident) -> Result<(), ()> {
+                fn set(&mut self, x: Self::SetterType) -> Result<(), ()> {
                     match x {
                         #(#setter_enum_ident::#names(x) => self.#names.set(x),)*
                         #setter_enum_ident::__None => { unimplemented!() }
@@ -216,7 +216,7 @@ impl Receiver {
             impl #impl_generics Setter for #ident #ty_generics #where_clause {
                 type SetterType = #setter_enum_ident #ty_generics;
 
-                fn set(&mut self, x: #setter_enum_ident)  -> Result<(), ()>{
+                fn set(&mut self, x: Self::SetterType)  -> Result<(), ()>{
                     match x {
                         #(#setter_enum_ident::#unit_variants =>
                             {*self = #ident::#unit_variants}

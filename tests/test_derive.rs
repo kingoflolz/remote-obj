@@ -31,7 +31,7 @@ pub struct Config<'a> {
 }
 
 #[test]
-fn test_setter() {
+fn test_derive() {
     let mut a = 0;
     let mut new = NewType {
         a: 0,

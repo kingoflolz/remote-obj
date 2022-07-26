@@ -100,7 +100,7 @@ impl Receiver {
                 type ValueType = #value_enum_ident #ty_generics;
                 type GetterType = #getter_enum_ident #ty_generics;
 
-                fn get(&self, x: #getter_enum_ident) -> Result<Self::ValueType, ()> {
+                fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
                     Ok(match x {
                         #(#getter_enum_ident::#names(x) => #value_enum_ident::#names(self.#names.get(x)?),)*
                         #getter_enum_ident::__None => { unimplemented!() }
@@ -246,7 +246,7 @@ impl Receiver {
                 type ValueType = #value_enum_ident #ty_generics;
                 type GetterType = #getter_enum_ident #ty_generics;
 
-                fn get(&self, x: #getter_enum_ident) -> Result<Self::ValueType, ()> {
+                fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
                     Ok(match x {
                         #getter_enum_ident::GetVariant => {
                             match self {
