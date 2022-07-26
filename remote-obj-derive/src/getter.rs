@@ -73,7 +73,7 @@ impl Receiver {
             #[derive(Default)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #getter_enum_ident {
+            #vis enum #getter_enum_ident #ty_generics {
                 #(#names(<#types as Getter>::GetterType),)*
                 #[default]
                 __None,
@@ -81,7 +81,7 @@ impl Receiver {
 
             #[automatically_derived]
             #[allow(non_snake_case)]
-            impl #getter_enum_ident {
+            impl #impl_generics #getter_enum_ident #ty_generics {
                 #vis #(fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Getter>::GetterType) -> <#types as Getter>::GetterType {
                     #getter_enum_ident::#names(func(<#types as Getter>::GetterType::default()))
                 })*
@@ -90,15 +90,15 @@ impl Receiver {
             #[automatically_derived]
             #[allow(non_camel_case_types)]
             #[derive(#(#inner_derives),*)]
-            #vis enum #value_enum_ident {
+            #vis enum #value_enum_ident #ty_generics {
                 #(#names(<#types as Getter>::ValueType)),*
             }
 
             #[automatically_derived]
             #[allow(non_snake_case)]
-            impl Getter for #impl_generics #ident #ty_generics #where_clause {
-                type ValueType = #value_enum_ident;
-                type GetterType = #getter_enum_ident;
+            impl #impl_generics Getter for #ident #ty_generics #where_clause {
+                type ValueType = #value_enum_ident #ty_generics;
+                type GetterType = #getter_enum_ident #ty_generics;
 
                 fn get(&self, x: #getter_enum_ident) -> Result<Self::ValueType, ()> {
                     Ok(match x {
@@ -109,7 +109,7 @@ impl Receiver {
             }
 
             #[allow(non_snake_case)]
-            impl #value_enum_ident {
+            impl #impl_generics #value_enum_ident #ty_generics {
                 #(fn #names(self) -> <#types as Getter>::ValueType {
                     match self {
                         #value_enum_ident::#names(x) => x,
@@ -212,7 +212,7 @@ impl Receiver {
             #[derive(Default)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #getter_enum_ident {
+            #vis enum #getter_enum_ident #ty_generics {
                 GetVariant,
                 #(#newtype_variants(<#newtype_types as Getter>::GetterType),)*
                 #[default]
@@ -221,7 +221,7 @@ impl Receiver {
 
             #[automatically_derived]
             #[allow(non_snake_case)]
-            impl #getter_enum_ident {
+            impl #impl_generics #getter_enum_ident #ty_generics {
                 #vis fn make_var<F>(&self, func: F) -> Self where F: Fn(()) -> () {
                     #getter_enum_ident::GetVariant
                 }
@@ -234,7 +234,7 @@ impl Receiver {
             #[automatically_derived]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #value_enum_ident {
+            #vis enum #value_enum_ident #ty_generics {
                 #(#newtype_value_variants(<#newtype_types as Getter>::ValueType),)*
                 #(#unit_variants,)*
                 #(#newtype_variants,)*
@@ -242,9 +242,9 @@ impl Receiver {
 
             #[automatically_derived]
             #[allow(non_snake_case)]
-            impl Getter for #impl_generics #ident #ty_generics #where_clause {
-                type ValueType = #value_enum_ident;
-                type GetterType = #getter_enum_ident;
+            impl #impl_generics Getter for #ident #ty_generics #where_clause {
+                type ValueType = #value_enum_ident #ty_generics;
+                type GetterType = #getter_enum_ident #ty_generics;
 
                 fn get(&self, x: #getter_enum_ident) -> Result<Self::ValueType, ()> {
                     Ok(match x {
@@ -266,7 +266,7 @@ impl Receiver {
             }
 
             #[allow(non_snake_case)]
-            impl #value_enum_ident {
+            impl #impl_generics #value_enum_ident #ty_generics {
                 #(fn #newtype_variants(self) -> <#newtype_types as Getter>::ValueType {
                     match self {
                         Self::#newtype_value_variants(x) => x,

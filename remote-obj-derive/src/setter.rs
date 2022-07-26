@@ -52,6 +52,8 @@ impl Receiver {
         let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
         let fields = self.setter_fields_to_emit();
 
+        // panic!("{:?}, {:?}, {:?}", impl_generics, ty_generics, where_clause);
+
         let types: Vec<_> = fields.iter().map(|field|
             field.ty.clone()
         ).collect();
@@ -71,22 +73,22 @@ impl Receiver {
             #[derive(Default)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #setter_enum_ident {
+            #vis enum #setter_enum_ident #ty_generics {
                 #(#names(<#types as Setter>::SetterType),)*
                 #[default]
                 __None,
             }
 
             #[allow(non_snake_case)]
-            impl #setter_enum_ident {
+            impl #impl_generics #setter_enum_ident #ty_generics {
                 #vis #(fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Setter>::SetterType) -> <#types as Setter>::SetterType {
                     #setter_enum_ident::#names(func(<#types as Setter>::SetterType::default()))
                 })*
             }
 
             #[allow(non_snake_case)]
-            impl Setter for #impl_generics #ident #ty_generics #where_clause {
-                type SetterType = #setter_enum_ident;
+            impl #impl_generics Setter for #ident #ty_generics #where_clause {
+                type SetterType = #setter_enum_ident #ty_generics;
 
                 fn set(&mut self, x: #setter_enum_ident) -> Result<(), ()> {
                     match x {
@@ -191,7 +193,7 @@ impl Receiver {
             #[derive(Default)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #setter_enum_ident {
+            #vis enum #setter_enum_ident #ty_generics {
                 #(#unit_variants,)*
                 #(#newtype_variants(<#newtype_types as Setter>::SetterType),)*
                 #[default]
@@ -199,7 +201,7 @@ impl Receiver {
             }
 
             #[allow(non_snake_case)]
-            impl #setter_enum_ident {
+            impl #impl_generics #setter_enum_ident #ty_generics {
                 #(#vis fn #unit_variant_method_names<F>(&self, func: F) -> Self where F: Fn(()) -> () {
                     #setter_enum_ident::#unit_variants
                 })*
@@ -211,8 +213,8 @@ impl Receiver {
             }
 
             #[allow(non_snake_case)]
-            impl Setter for #impl_generics #ident #ty_generics #where_clause {
-                type SetterType = #setter_enum_ident;
+            impl #impl_generics Setter for #ident #ty_generics #where_clause {
+                type SetterType = #setter_enum_ident #ty_generics;
 
                 fn set(&mut self, x: #setter_enum_ident)  -> Result<(), ()>{
                     match x {

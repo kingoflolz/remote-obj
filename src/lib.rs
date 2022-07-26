@@ -2,6 +2,7 @@
 
 use core::ops::Index;
 pub use remote_obj_derive::{RemoteSetter, RemoteGetter, setter, getter};
+use bincode::{Encode, Decode};
 
 pub mod prelude {
     pub use crate::{
@@ -64,7 +65,7 @@ impl_primitive!(bool);
 
 impl_primitive!(char);
 
-
+#[derive(Debug, Encode, Decode, Copy, Clone)]
 pub struct ArrHelper<T> {
     r: T,
     idx: usize,
@@ -140,5 +141,36 @@ impl<T, const N: usize> Getter for [T; N]
             }
             None => Err(()),
         }
+    }
+}
+
+
+impl<T> Setter for &mut T where T: Setter,
+{
+    type SetterType = T::SetterType;
+
+    fn set(&mut self, x: Self::SetterType) -> Result<(), ()> {
+        (**self).set(x)
+    }
+}
+
+
+impl<T> Getter for &T where T: Getter,
+{
+    type ValueType = T::ValueType;
+    type GetterType = T::GetterType;
+
+    fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
+        (**self).get(x)
+    }
+}
+
+impl<T> Getter for &mut T where T: Getter,
+{
+    type ValueType = T::ValueType;
+    type GetterType = T::GetterType;
+
+    fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
+        (**self).get(x)
     }
 }

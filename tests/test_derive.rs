@@ -6,15 +6,6 @@ pub struct Test {
     b: i8,
 }
 
-impl Test {
-    fn new() -> Self {
-        Test {
-            a: 0,
-            b: 0,
-        }
-    }
-}
-
 #[derive(RemoteSetter, RemoteGetter)]
 pub struct NewType {
     a: i8,
@@ -28,8 +19,8 @@ pub enum TestEnum {
 }
 
 #[derive(RemoteSetter, RemoteGetter)]
-pub struct Config {
-    a: i8,
+pub struct Config<'a> {
+    a: &'a mut i8,
     #[remote(read_only)]
     b: i8,
     #[remote(write_only)]
@@ -39,25 +30,24 @@ pub struct Config {
     f: [i8; 8]
 }
 
-impl Config {
-    fn new() -> Config {
-        Config {
-            a: 0,
-            b: 0,
-            c: 0,
-            d: Test::new(),
-            e: TestEnum::B(NewType {
-                a: 0,
-                b: 0,
-            }),
-            f: [0; 8]
-        }
-    }
-}
-
 #[test]
 fn test_setter() {
-    let mut config = Config::new();
+    let mut a = 0;
+    let mut new = NewType {
+        a: 0,
+        b: 0
+    };
+    let mut config = Config {
+        a: &mut a,
+        b: 0,
+        c: 0,
+        d: Test {
+            a: 0,
+            b: 0
+        },
+        e: TestEnum::B(new),
+        f: [0; 8]
+    };
     // read-only
     // config.set(setter!(Config.b(1)));
 

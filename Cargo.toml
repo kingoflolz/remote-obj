@@ -10,3 +10,4 @@ members = ["remote-obj-derive"]
 
 [dependencies]
 remote-obj-derive = { path = "remote-obj-derive" }
+bincode = { version = "2.0.0-beta.1", features = ["derive"], default-features = false}
