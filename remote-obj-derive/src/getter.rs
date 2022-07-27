@@ -106,6 +106,16 @@ impl Receiver {
                         #getter_enum_ident::__None => { unimplemented!() }
                     })
                 }
+
+                fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+                    match x {
+                        #(#getter_enum_ident::#names(x) => {
+                            let (x, len) = <#types as Getter>::hydrate(x, buf)?;
+                            Ok((#value_enum_ident::#names(x), len))
+                        },)*
+                        #getter_enum_ident::__None => { unimplemented!() }
+                    }
+                }
             }
 
             #[allow(non_snake_case)]
@@ -116,6 +126,15 @@ impl Receiver {
                         _ => unreachable!(),
                     }
                 })*
+            }
+
+            impl #impl_generics Value for #value_enum_ident #ty_generics {
+                fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
+                    match self {
+                        #(#value_enum_ident::#names(inner) => inner.dehydrate(x), )*
+                        _ => unreachable!(),
+                    }
+                }
             }
         })
     }
@@ -263,6 +282,16 @@ impl Receiver {
                         #getter_enum_ident::__None => { unimplemented!() }
                     })
                 }
+
+                fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+                    match x {
+                        #(#getter_enum_ident::#newtype_variants(x) => {
+                            let (x, len) = <#newtype_types as Getter>::hydrate(x, buf)?;
+                            Ok((#value_enum_ident::#newtype_value_variants(x), len))
+                        },)*
+                        _ => { unimplemented!() }
+                    }
+                }
             }
 
             #[allow(non_snake_case)]
@@ -273,6 +302,15 @@ impl Receiver {
                         _ => unreachable!(),
                     }
                 })*
+            }
+
+            impl #impl_generics Value for #value_enum_ident #ty_generics {
+                fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
+                    match self {
+                        #(#value_enum_ident::#newtype_value_variants(inner) => inner.dehydrate(x), )*
+                        _ => unreachable!(),
+                    }
+                }
             }
         })
     }

@@ -1,13 +1,19 @@
 #![no_std]
 
+use core::mem::size_of;
 use core::ops::Index;
 pub use remote_obj_derive::{RemoteSetter, RemoteGetter, setter, getter};
 use bincode::{Encode, Decode};
 
 pub mod prelude {
     pub use crate::{
-        RemoteSetter, RemoteGetter, setter, getter, Setter, Getter
+        RemoteSetter, RemoteGetter, setter, getter, Setter, Getter, Value
     };
+    pub use core::any::Any;
+}
+
+pub trait Value {
+    fn dehydrate(&self, x: &mut [u8]) -> Option<usize>;
 }
 
 pub trait Setter {
@@ -20,6 +26,8 @@ pub trait Getter {
     type GetterType: Default;
 
     fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> ;
+
+    fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> ;
 }
 
 macro_rules! impl_primitive {
@@ -40,11 +48,60 @@ macro_rules! impl_primitive {
             fn get(&self, _: ()) -> Result<Self::ValueType, ()> {
                 Ok(*self)
             }
+
+            fn hydrate(_: (), buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+                const SIZE: usize = size_of::<$t>();
+                if buf.len() < SIZE {
+                    return Err(());
+                }
+                Ok((<$t>::from_le_bytes(buf[0..SIZE].try_into().unwrap()), SIZE))
+            }
         }
     }
 }
 
-impl_primitive!(());
+// impl_primitive!(());
+impl Setter for () {
+    type SetterType = ();
+
+    fn set(&mut self, x: Self::SetterType) -> Result<(), ()>{
+        *self = x;
+        Ok(())
+    }
+}
+
+impl Getter for () {
+    type ValueType = ();
+    type GetterType = ();
+
+    fn get(&self, _: ()) -> Result<Self::ValueType, ()> {
+        Ok(*self)
+    }
+
+    fn hydrate(_: (), _: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+        Ok(((), 0))
+    }
+}
+
+impl Value for (){
+    fn dehydrate(&self, _: &mut [u8]) -> Option<usize> {
+        Some(0)
+    }
+}
+
+macro_rules! impl_int_primitive {
+    ($t:ty) => {
+         impl Value for $t {
+            fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
+                let buf = self.to_le_bytes();
+                for (idx, i) in buf.iter().enumerate() {
+                    x[idx] = *i;
+                }
+                Some(buf.len())
+            }
+        }
+    }
+}
 
 impl_primitive!(i8);
 impl_primitive!(i16);
@@ -58,12 +115,39 @@ impl_primitive!(u32);
 impl_primitive!(u64);
 impl_primitive!(usize);
 
+impl_int_primitive!(i8);
+impl_int_primitive!(i16);
+impl_int_primitive!(i32);
+impl_int_primitive!(i64);
+impl_int_primitive!(isize);
+
+impl_int_primitive!(u8);
+impl_int_primitive!(u16);
+impl_int_primitive!(u32);
+impl_int_primitive!(u64);
+impl_int_primitive!(usize);
+
 impl_primitive!(f32);
 impl_primitive!(f64);
 
-impl_primitive!(bool);
+impl_int_primitive!(f32);
+impl_int_primitive!(f64);
 
-impl_primitive!(char);
+// impl_primitive!(bool);
+
+impl Value for bool {
+    fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
+        match *self {
+            true => {
+                x[0] = 0;
+            },
+            false => {
+                x[0] = 1;
+            }
+        };
+        Some(1)
+    }
+}
 
 #[derive(Debug, Encode, Decode, Copy, Clone)]
 pub struct ArrHelper<T> {
@@ -107,6 +191,12 @@ impl<T: Default> Default for ArrHelper<T> {
     }
 }
 
+impl<T: Value> Value for ArrHelper<T> {
+    fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
+        self.r.dehydrate(x)
+    }
+}
+
 impl<T, const N: usize> Setter for [T; N]
     where
         T: Setter + Default,
@@ -142,6 +232,14 @@ impl<T, const N: usize> Getter for [T; N]
             None => Err(()),
         }
     }
+
+    fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+        let (val, len) = T::hydrate(x.r, buf)?;
+        Ok((ArrHelper {
+            r: val,
+            idx: x.idx,
+        }, len))
+    }
 }
 
 
@@ -163,6 +261,10 @@ impl<T> Getter for &T where T: Getter,
     fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
         (**self).get(x)
     }
+
+    fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+        T::hydrate(x, buf)
+    }
 }
 
 impl<T> Getter for &mut T where T: Getter,
@@ -172,5 +274,9 @@ impl<T> Getter for &mut T where T: Getter,
 
     fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
         (**self).get(x)
+    }
+
+    fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+        T::hydrate(x, buf)
     }
 }

@@ -219,7 +219,10 @@ impl Receiver {
                 fn set(&mut self, x: Self::SetterType)  -> Result<(), ()>{
                     match x {
                         #(#setter_enum_ident::#unit_variants =>
-                            {*self = #ident::#unit_variants}
+                            {
+                                *self = #ident::#unit_variants;
+                                return Ok(())
+                            }
                         )*
                         #(#setter_enum_ident::#newtype_variants(setter) =>
                             match self {
@@ -233,7 +236,6 @@ impl Receiver {
                         )*
                         #setter_enum_ident::__None => { unimplemented!() }
                     };
-                    Ok(())
                 }
             }
         })

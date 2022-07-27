@@ -33,7 +33,7 @@ pub struct Config<'a> {
 #[test]
 fn test_derive() {
     let mut a = 0;
-    let mut new = NewType {
+    let new = NewType {
         a: 0,
         b: 0
     };
