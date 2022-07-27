@@ -70,7 +70,7 @@ impl Receiver {
 
         tokens.extend(quote! {
             #[automatically_derived]
-            #[derive(Default)]
+            #[derive(Default, Clone, Copy)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #getter_enum_ident #ty_generics {
@@ -228,7 +228,7 @@ impl Receiver {
 
         tokens.extend(quote! {
             #[automatically_derived]
-            #[derive(Default)]
+            #[derive(Default, Clone, Copy)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #getter_enum_ident #ty_generics {
