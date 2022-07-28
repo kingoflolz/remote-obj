@@ -4,6 +4,7 @@ use darling::util::PathList;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{Generics, Ident, Type, Visibility};
+use crate::helper::strip_ref;
 
 #[derive(FromDeriveInput)]
 #[darling(supports(struct_named, enum_any), forward_attrs(derive), attributes(remote))]
@@ -55,7 +56,7 @@ impl Receiver {
         // panic!("{:?}, {:?}, {:?}", impl_generics, ty_generics, where_clause);
 
         let types: Vec<_> = fields.iter().map(|field|
-            field.ty.clone()
+            strip_ref(field.ty.clone())
         ).collect();
 
         let names: Vec<_> = fields.clone().into_iter().map(|field|
@@ -73,14 +74,14 @@ impl Receiver {
             #[derive(Default)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #setter_enum_ident #ty_generics {
+            #vis enum #setter_enum_ident {
                 #(#names(<#types as Setter>::SetterType),)*
                 #[default]
                 __None,
             }
 
             #[allow(non_snake_case)]
-            impl #impl_generics #setter_enum_ident #ty_generics {
+            impl #impl_generics #setter_enum_ident {
                 #vis #(fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Setter>::SetterType) -> <#types as Setter>::SetterType {
                     #setter_enum_ident::#names(func(<#types as Setter>::SetterType::default()))
                 })*
@@ -88,7 +89,7 @@ impl Receiver {
 
             #[allow(non_snake_case)]
             impl #impl_generics Setter for #ident #ty_generics #where_clause {
-                type SetterType = #setter_enum_ident #ty_generics;
+                type SetterType = #setter_enum_ident;
 
                 fn set(&mut self, x: Self::SetterType) -> Result<(), ()> {
                     match x {
@@ -145,7 +146,7 @@ impl Receiver {
             .expect("VariantNames only takes enums")
             .into_iter()
             .filter(|v| v.fields.is_newtype())
-            .map(|v| v.fields.fields.first().unwrap().ty.clone())
+            .map(|v| strip_ref(v.fields.fields.first().unwrap().ty.clone()))
             .collect()
     }
 

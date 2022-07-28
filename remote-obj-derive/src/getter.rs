@@ -3,6 +3,7 @@ use darling::util::PathList;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote, ToTokens};
 use syn::{Generics, Ident, Type, Visibility};
+use crate::helper::strip_ref;
 
 #[derive(FromDeriveInput)]
 #[darling(supports(struct_named, enum_any), forward_attrs(derive), attributes(remote))]
@@ -54,7 +55,7 @@ impl Receiver {
         let fields = self.getter_fields_to_emit();
 
         let types: Vec<_> = fields.iter().map(|field|
-            field.ty.clone()
+            strip_ref(field.ty.clone())
         ).collect();
 
         let method_names: Vec<_> = fields.clone().into_iter().map(|field| {
@@ -73,7 +74,7 @@ impl Receiver {
             #[derive(Default, Clone, Copy)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #getter_enum_ident #ty_generics {
+            #vis enum #getter_enum_ident {
                 #(#names(<#types as Getter>::GetterType),)*
                 #[default]
                 __None,
@@ -81,7 +82,7 @@ impl Receiver {
 
             #[automatically_derived]
             #[allow(non_snake_case)]
-            impl #impl_generics #getter_enum_ident #ty_generics {
+            impl #impl_generics #getter_enum_ident {
                 #vis #(fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Getter>::GetterType) -> <#types as Getter>::GetterType {
                     #getter_enum_ident::#names(func(<#types as Getter>::GetterType::default()))
                 })*
@@ -90,15 +91,15 @@ impl Receiver {
             #[automatically_derived]
             #[allow(non_camel_case_types)]
             #[derive(#(#inner_derives),*)]
-            #vis enum #value_enum_ident #ty_generics {
+            #vis enum #value_enum_ident {
                 #(#names(<#types as Getter>::ValueType)),*
             }
 
             #[automatically_derived]
             #[allow(non_snake_case)]
             impl #impl_generics Getter for #ident #ty_generics #where_clause {
-                type ValueType = #value_enum_ident #ty_generics;
-                type GetterType = #getter_enum_ident #ty_generics;
+                type ValueType = #value_enum_ident;
+                type GetterType = #getter_enum_ident;
 
                 fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
                     Ok(match x {
@@ -119,7 +120,7 @@ impl Receiver {
             }
 
             #[allow(non_snake_case)]
-            impl #impl_generics #value_enum_ident #ty_generics {
+            impl #impl_generics #value_enum_ident {
                 #(fn #names(self) -> <#types as Getter>::ValueType {
                     match self {
                         #value_enum_ident::#names(x) => x,
@@ -128,7 +129,7 @@ impl Receiver {
                 })*
             }
 
-            impl #impl_generics Value for #value_enum_ident #ty_generics {
+            impl #impl_generics Value for #value_enum_ident {
                 fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
                     match self {
                         #(#value_enum_ident::#names(inner) => inner.dehydrate(x), )*
@@ -184,7 +185,7 @@ impl Receiver {
             .expect("VariantNames only takes enums")
             .into_iter()
             .filter(|v| v.fields.is_newtype())
-            .map(|v| v.fields.fields.first().unwrap().ty.clone())
+            .map(|v| strip_ref(v.fields.fields.first().unwrap().ty.clone()))
             .collect()
     }
 
@@ -231,7 +232,7 @@ impl Receiver {
             #[derive(Default, Clone, Copy)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #getter_enum_ident #ty_generics {
+            #vis enum #getter_enum_ident {
                 GetVariant,
                 #(#newtype_variants(<#newtype_types as Getter>::GetterType),)*
                 #[default]
@@ -253,7 +254,7 @@ impl Receiver {
             #[automatically_derived]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #vis enum #value_enum_ident #ty_generics {
+            #vis enum #value_enum_ident {
                 #(#newtype_value_variants(<#newtype_types as Getter>::ValueType),)*
                 #(#unit_variants,)*
                 #(#newtype_variants,)*

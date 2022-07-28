@@ -1,7 +1,7 @@
 use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
-use syn::{Expr, token, bracketed};
+use syn::{Expr, token, bracketed, Type};
 
 extern crate proc_macro2;
 
@@ -163,5 +163,13 @@ impl ToTokens for Getter {
                 #partial
             }
         })
+    }
+}
+
+pub(crate) fn strip_ref(ty: Type) -> Type {
+    if let Type::Reference(ref ty) = ty {
+        strip_ref(*ty.elem.clone())
+    } else {
+        ty
     }
 }

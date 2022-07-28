@@ -1,39 +1,42 @@
 use remote_obj::prelude::*;
 
 #[derive(RemoteSetter, RemoteGetter)]
-pub struct Test<'a> {
-    a: &'a mut i8,
-    b: &'a mut i8,
+pub struct TestInner {
+    a: i8,
+    b: i8,
 }
 
 #[derive(RemoteSetter, RemoteGetter)]
-pub struct NestedTest<'a> {
-    a: &'a mut Test<'a>,
-    b: &'a mut Test<'a>,
+pub enum EnumTest {
+    A(TestInner),
+    B,
+}
+
+#[derive(RemoteSetter, RemoteGetter)]
+pub struct Test<'a> {
+    a: &'a mut i8,
+    b: &'a mut i8,
+    c: &'a mut EnumTest,
 }
 
 #[test]
 fn test_ref() {
     let mut a = 0;
     let mut b = 0;
-    let mut test_ab = Test {
+    let mut test = Test {
         a: &mut a,
         b: &mut b,
+        c: &mut EnumTest::A(TestInner{
+            a: 0,
+            b: 0
+        })
     };
 
-    let mut c = 0;
-    let mut d = 0;
-    let mut test_cd = Test {
-        a: &mut c,
-        b: &mut d,
-    };
+    test.set(setter!(Test.a = 1)).unwrap();
+    let v = test.get(getter!(Test.a)).unwrap();
+    assert_eq!(v.a(), 1);
 
-    let mut nested = NestedTest {
-        a: &mut test_ab,
-        b: &mut test_cd,
-    };
-
-    nested.set(setter!(NestedTest.a.a = 1)).unwrap();
-    let v = nested.get(getter!(NestedTest.a.a)).unwrap();
-    assert_eq!(v.a().a(), 1);
+    test.set(setter!(Test.c::A.a = 1)).unwrap();
+    let v = test.get(getter!(Test.c::A.a)).unwrap();
+    assert_eq!(v.c().A().a(), 1);
 }
