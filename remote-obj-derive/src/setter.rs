@@ -82,7 +82,7 @@ impl Receiver {
 
             #[allow(non_snake_case)]
             impl #impl_generics #setter_enum_ident {
-                #vis #(fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Setter>::SetterType) -> <#types as Setter>::SetterType {
+                #(#vis fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Setter>::SetterType) -> <#types as Setter>::SetterType {
                     #setter_enum_ident::#names(func(<#types as Setter>::SetterType::default()))
                 })*
             }

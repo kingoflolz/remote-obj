@@ -71,7 +71,7 @@ impl Receiver {
 
         tokens.extend(quote! {
             #[automatically_derived]
-            #[derive(Default, Clone, Copy)]
+            #[derive(Default, Clone, Hash, PartialEq, Eq, Copy)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #getter_enum_ident {
@@ -83,7 +83,7 @@ impl Receiver {
             #[automatically_derived]
             #[allow(non_snake_case)]
             impl #impl_generics #getter_enum_ident {
-                #vis #(fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Getter>::GetterType) -> <#types as Getter>::GetterType {
+                #(#vis fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Getter>::GetterType) -> <#types as Getter>::GetterType {
                     #getter_enum_ident::#names(func(<#types as Getter>::GetterType::default()))
                 })*
             }
@@ -134,6 +134,13 @@ impl Receiver {
                     match self {
                         #(#value_enum_ident::#names(inner) => inner.dehydrate(x), )*
                         _ => unreachable!(),
+                    }
+                }
+
+                fn as_float(&self) -> Option<f32> {
+                    match self {
+                        #(#value_enum_ident::#names(inner) => inner.as_float(), )*
+                        _ => None,
                     }
                 }
             }
@@ -229,7 +236,7 @@ impl Receiver {
 
         tokens.extend(quote! {
             #[automatically_derived]
-            #[derive(Default, Clone, Copy)]
+            #[derive(Default, Clone, Hash, PartialEq, Eq, Copy)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #getter_enum_ident {
@@ -310,6 +317,13 @@ impl Receiver {
                     match self {
                         #(#value_enum_ident::#newtype_value_variants(inner) => inner.dehydrate(x), )*
                         _ => unreachable!(),
+                    }
+                }
+
+                fn as_float(&self) -> Option<f32> {
+                    match self {
+                        #(#value_enum_ident::#newtype_value_variants(inner) => inner.as_float(), )*
+                        _ => None,
                     }
                 }
             }

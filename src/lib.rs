@@ -1,5 +1,7 @@
 #![no_std]
 
+use core::any::Any;
+use core::hash::Hash;
 use core::mem::size_of;
 use core::ops::Index;
 pub use remote_obj_derive::{RemoteSetter, RemoteGetter, setter, getter};
@@ -14,6 +16,9 @@ pub mod prelude {
 
 pub trait Value {
     fn dehydrate(&self, x: &mut [u8]) -> Option<usize>;
+    fn as_float(&self) -> Option<f32> {
+        None
+    }
 }
 
 pub trait Setter {
@@ -22,8 +27,8 @@ pub trait Setter {
 }
 
 pub trait Getter {
-    type ValueType;
-    type GetterType: Default;
+    type ValueType: Value;
+    type GetterType: Default + Hash + Eq + Clone + Copy;
 
     fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> ;
 
@@ -83,7 +88,7 @@ impl Getter for () {
     }
 }
 
-impl Value for (){
+impl Value for () {
     fn dehydrate(&self, _: &mut [u8]) -> Option<usize> {
         Some(0)
     }
@@ -91,13 +96,17 @@ impl Value for (){
 
 macro_rules! impl_int_primitive {
     ($t:ty) => {
-         impl Value for $t {
+        impl Value for $t {
             fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
                 let buf = self.to_le_bytes();
                 for (idx, i) in buf.iter().enumerate() {
                     x[idx] = *i;
                 }
                 Some(buf.len())
+            }
+
+            fn as_float(&self) -> Option<f32> {
+                Some(*self as f32)
             }
         }
     }
@@ -149,13 +158,13 @@ impl Value for bool {
     }
 }
 
-#[derive(Debug, Encode, Decode, Copy, Clone)]
+#[derive(Debug, Encode, Decode, Clone, Hash, PartialEq, Eq, Copy)]
 pub struct ArrHelper<T> {
     r: T,
     idx: usize,
 }
 
-impl<T: Setter + Setter<SetterType = T> + Default> ArrHelper<T>  {
+impl<T: Setter + Setter<SetterType = T> + Default + Hash + PartialEq + Eq> ArrHelper<T>  {
     pub fn arr_set<F>(self, idx: usize, func: F) -> Self where F: Fn(<T as Setter>::SetterType) -> <T as Setter>::SetterType {
         ArrHelper {
             r: func(<T as Setter>::SetterType::default()),
@@ -164,7 +173,7 @@ impl<T: Setter + Setter<SetterType = T> + Default> ArrHelper<T>  {
     }
 }
 
-impl<T: Getter + Getter<GetterType = T> + Default> ArrHelper<T>  {
+impl<T: Getter + Getter<GetterType = T> + Default + Hash + PartialEq + Eq> ArrHelper<T>  {
     pub fn arr_get<F>(self, idx: usize, func: F) -> Self where F: Fn(<T as Getter>::GetterType) -> <T as Getter>::GetterType {
         ArrHelper {
             r: func(<T as Getter>::GetterType::default()),
@@ -194,6 +203,9 @@ impl<T: Default> Default for ArrHelper<T> {
 impl<T: Value> Value for ArrHelper<T> {
     fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
         self.r.dehydrate(x)
+    }
+    fn as_float(&self) -> Option<f32> {
+        self.r.as_float()
     }
 }
 
