@@ -104,6 +104,21 @@ impl Receiver {
                 }
             }
 
+            impl core::fmt::Display for #setter_enum_ident {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    match self {
+                        #(#setter_enum_ident::#names(x) => {
+                            write!(f, #names_string)?;
+                            write!(f, "{}", x)?;
+                        },)*
+                        _ => {
+                            unreachable!();
+                        }
+                    }
+                    Ok(())
+                }
+            }
+
             #[allow(non_snake_case)]
             impl #impl_generics RemoteSet for #ident #ty_generics #where_clause {
                 type SetterType = #setter_enum_ident;
@@ -252,6 +267,25 @@ impl Receiver {
                             return None;
                         }
                     };
+                }
+            }
+
+            impl core::fmt::Display for #setter_enum_ident {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    match self {
+                        #(#setter_enum_ident::#newtype_variants(ref x) => {
+                            write!(f, #newtype_variants_names_string)?;
+                            write!(f, "{}", x)?;
+                        },)*
+                        #(#setter_enum_ident::#unit_variants => {
+                            write!(f, " = ")?;
+                            write!(f, #unit_variants_names_string)?;
+                        },)*
+                        _ => {
+                            unreachable!();
+                        }
+                    }
+                    Ok(())
                 }
             }
 

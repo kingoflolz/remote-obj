@@ -139,7 +139,7 @@ impl ToTokens for Getter {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         let base_getter_type = format_ident!("{}Getter", self.base_type);
 
-        let mut partial = quote!{()};
+        let mut partial = quote!{NullGetter{}};
         for i in self.path.iter().rev() {
             match i {
                 IdentOrIndex::Field(i) | IdentOrIndex::Variant(i) => {

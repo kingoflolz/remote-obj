@@ -105,6 +105,20 @@ impl Receiver {
                 }
             }
 
+            impl core::fmt::Display for #getter_enum_ident {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    match self {
+                        #(#getter_enum_ident::#names(ref x) => {
+                            write!(f, #names_string)?;
+                            write!(f, "{}", x)
+                        },)*
+                        _ => {
+                            unreachable!();
+                        }
+                    }
+                }
+            }
+
             #[automatically_derived]
             #[allow(non_camel_case_types)]
             #[derive(#(#inner_derives),*)]
@@ -269,9 +283,6 @@ impl Receiver {
         let newtype_names_string: Vec<String> = newtype_variants.clone().into_iter().map(|field| {
             format!("::{}", field)
         }).collect();
-        let unit_names_string: Vec<String> = unit_variants.clone().into_iter().map(|field| {
-            format!("::{}", field)
-        }).collect();
 
         tokens.extend(quote! {
             #[automatically_derived]
@@ -288,7 +299,7 @@ impl Receiver {
             #[automatically_derived]
             #[allow(non_snake_case)]
             impl #impl_generics #getter_enum_ident #ty_generics {
-                #vis fn make_var<F>(&self, func: F) -> Self where F: Fn(()) -> () {
+                #vis fn make_var<F>(&self, func: F) -> Self where F: Fn(()) -> NullGetter {
                     #getter_enum_ident::GetVariant
                 }
 
@@ -308,6 +319,24 @@ impl Receiver {
                             return None;
                         }
                     };
+                }
+            }
+
+            impl core::fmt::Display for #getter_enum_ident {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                    match self {
+                        #(#getter_enum_ident::#newtype_variants(ref x) => {
+                            write!(f, #newtype_names_string)?;
+                            write!(f, "{}", x)?;
+                        },)*
+                        #getter_enum_ident::GetVariant => {
+                            write!(f, "GetVariant")?;
+                        },
+                        _ => {
+                            unreachable!();
+                        }
+                    }
+                    Ok(())
                 }
             }
 

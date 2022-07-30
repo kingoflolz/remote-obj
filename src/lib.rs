@@ -1,5 +1,7 @@
 #![no_std]
 
+use core::fmt;
+use core::fmt::{Display, Formatter};
 use core::hash::Hash;
 use core::mem::size_of;
 use core::ops::Index;
@@ -8,7 +10,7 @@ use bincode::{Encode, Decode};
 
 pub mod prelude {
     pub use crate::{
-        RemoteSetter, RemoteGetter, setter, getter, Setter, Getter, Value, RemoteSet, RemoteGet
+        RemoteSetter, RemoteGetter, setter, getter, Setter, Getter, Value, RemoteSet, RemoteGet, NullGetter
     };
     pub use core::any::Any;
 }
@@ -28,7 +30,7 @@ pub trait Value: Sized + Copy {
     }
 }
 
-pub trait Setter: Default + Sized + Copy {
+pub trait Setter: Default + Sized + Copy + Display {
     fn parse_setter<T: Sized>(&self, x: &str, set: T) -> Option<Self> {
         if x.is_empty() {
             assert_eq!(size_of::<Self>(), size_of::<T>(), "Setter::parse_setter: size mismatch");
@@ -49,7 +51,7 @@ pub trait RemoteSet {
     }
 }
 
-pub trait Getter: Default + Hash + Eq + Clone + Copy {
+pub trait Getter: Default + Hash + Eq + Clone + Copy + Display {
     fn parse_getter(&self, x: &str) -> Option<Self> {
         if x.is_empty() {
             Some(Self::default())
@@ -73,15 +75,33 @@ pub trait RemoteGet {
     }
 }
 
+#[derive(Encode, Decode, Default, Hash, Eq, Clone, Copy, PartialEq, Debug)]
+pub struct NullGetter;
+
+#[derive(Encode, Decode, Default, Hash, Eq, Clone, Copy, PartialEq, Debug)]
+pub struct NullSetter;
+
 impl Value for () {
     fn dehydrate(&self, _x: &mut [u8]) -> Option<usize> {
         Some(0)
     }
 }
 
-impl Setter for () {}
+impl Display for NullSetter {
+    fn fmt(&self, _: &mut Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
 
-impl Getter for () {}
+impl Setter for NullSetter {}
+
+impl Display for NullGetter {
+    fn fmt(&self, _: &mut Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl Getter for NullGetter {}
 
 macro_rules! impl_num_primitive {
     ($t:ty) => {
@@ -96,13 +116,13 @@ macro_rules! impl_num_primitive {
 
         impl RemoteGet for $t {
             type ValueType = Self;
-            type GetterType = ();
+            type GetterType = NullGetter;
 
             fn get(&self, _: Self::GetterType) -> Result<Self::ValueType, ()> {
                 Ok(*self)
             }
 
-            fn hydrate(_: (), buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
+            fn hydrate(_: NullGetter, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
                 const SIZE: usize = size_of::<$t>();
                 if buf.len() < SIZE {
                     return Err(());
@@ -169,6 +189,12 @@ impl<T: Copy + Default> Default for ArrHelper<T> {
             r: T::default(),
             idx: 0,
         }
+    }
+}
+
+impl<T: Copy + Default + Display> Display for ArrHelper<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}]{}", self.idx, self.r)
     }
 }
 

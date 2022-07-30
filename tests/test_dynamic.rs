@@ -37,23 +37,35 @@ fn test_dynamic() {
         d: [0; 8]
     };
 
-    let setter = Test::dynamic_setter::<i8>(".a", 1).unwrap();
+    let path = ".a";
+    let x = 1;
+    let setter = Test::dynamic_setter::<i8>(path, x).unwrap();
+    assert_eq!(format!("{}", path), path.to_string());
     test.set(setter).unwrap();
-    let getter = Test::dynamic_getter(".a").unwrap();
+    let getter = Test::dynamic_getter(path).unwrap();
+    assert_eq!(format!("{}", getter), path.to_string());
     let value = test.get(getter).unwrap();
-    assert_eq!(value.parse_value::<i8>(".a").unwrap(), 1);
+    assert_eq!(value.parse_value::<i8>(path).unwrap(), x);
 
-    let setter = Test::dynamic_setter::<i8>(".b.a", 2).unwrap();
+    let path = ".b.a";
+    let x = 2;
+    let setter = Test::dynamic_setter::<i8>(path, x).unwrap();
+    assert_eq!(format!("{}", path), path.to_string());
     test.set(setter).unwrap();
-    let getter = Test::dynamic_getter(".b.a").unwrap();
+    let getter = Test::dynamic_getter(path).unwrap();
+    assert_eq!(format!("{}", getter), path.to_string());
     let value = test.get(getter).unwrap();
-    assert_eq!(value.parse_value::<i8>(".b.a").unwrap(), 2);
+    assert_eq!(value.parse_value::<i8>(path).unwrap(), x);
 
-    let setter = Test::dynamic_setter::<i8>(".c::B.a", 3).unwrap();
+    let path = ".c::B.a";
+    let x = 3;
+    let setter = Test::dynamic_setter::<i8>(path, x).unwrap();
+    assert_eq!(format!("{}", path), path.to_string());
     test.set(setter).unwrap();
-    let getter = Test::dynamic_getter(".c::B.a").unwrap();
+    let getter = Test::dynamic_getter(path).unwrap();
+    assert_eq!(format!("{}", getter), path.to_string());
     let value = test.get(getter).unwrap();
-    assert_eq!(value.parse_value::<i8>(".c::B.a").unwrap(), 3);
+    assert_eq!(value.parse_value::<i8>(path).unwrap(), x);
 
     let setter = Test::dynamic_setter::<()>(".c::A", ()).unwrap();
     test.set(setter).unwrap();
@@ -64,9 +76,13 @@ fn test_dynamic() {
         TestEnum::A => {}
     }
 
-    let setter = Test::dynamic_setter::<i8>(".d[4]", 4).unwrap();
+    let path = ".d[4]";
+    let x = 4;
+    let setter = Test::dynamic_setter::<i8>(path, x).unwrap();
+    assert_eq!(format!("{}", path), path.to_string());
     test.set(setter).unwrap();
-    let getter = Test::dynamic_getter(".d[4]").unwrap();
+    let getter = Test::dynamic_getter(path).unwrap();
+    assert_eq!(format!("{}", getter), path.to_string());
     let value = test.get(getter).unwrap();
-    assert_eq!(value.parse_value::<i8>(".d[4]").unwrap(), 4);
+    assert_eq!(value.parse_value::<i8>(path).unwrap(), x);
 }
