@@ -62,9 +62,13 @@ impl Receiver {
             format_ident!("make_{}", field.ident.unwrap())
         }).collect();
 
-        let names: Vec<_> = fields.into_iter().map(|field|
+        let names: Vec<_> = fields.clone().into_iter().map(|field|
             field.ident.unwrap()
         ).collect();
+
+        let names_string: Vec<String> = fields.into_iter().map(|field| {
+            format!(".{}", field.ident.unwrap())
+        }).collect();
 
         let vis = &self.vis;
         let inner_derives = &self.derive;
@@ -75,7 +79,7 @@ impl Receiver {
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #getter_enum_ident {
-                #(#names(<#types as Getter>::GetterType),)*
+                #(#names(<#types as RemoteGet>::GetterType),)*
                 #[default]
                 __None,
             }
@@ -83,21 +87,35 @@ impl Receiver {
             #[automatically_derived]
             #[allow(non_snake_case)]
             impl #impl_generics #getter_enum_ident {
-                #(#vis fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Getter>::GetterType) -> <#types as Getter>::GetterType {
-                    #getter_enum_ident::#names(func(<#types as Getter>::GetterType::default()))
+                #(#vis fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as RemoteGet>::GetterType) -> <#types as RemoteGet>::GetterType {
+                    #getter_enum_ident::#names(func(<#types as RemoteGet>::GetterType::default()))
                 })*
+            }
+
+            impl Getter for #getter_enum_ident {
+                fn parse_getter(&self, s: &str) -> Option<Self> {
+                    match &s[..] {
+                        #(s if s.starts_with(#names_string) => {
+                            return Some(#getter_enum_ident::#names(<#types as RemoteGet>::GetterType::default().parse_getter(&s[#names_string.len()..])?));
+                        })*,
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
             }
 
             #[automatically_derived]
             #[allow(non_camel_case_types)]
             #[derive(#(#inner_derives),*)]
+            #[derive(Copy, Clone)]
             #vis enum #value_enum_ident {
-                #(#names(<#types as Getter>::ValueType)),*
+                #(#names(<#types as RemoteGet>::ValueType)),*
             }
 
             #[automatically_derived]
             #[allow(non_snake_case)]
-            impl #impl_generics Getter for #ident #ty_generics #where_clause {
+            impl #impl_generics RemoteGet for #ident #ty_generics #where_clause {
                 type ValueType = #value_enum_ident;
                 type GetterType = #getter_enum_ident;
 
@@ -111,7 +129,7 @@ impl Receiver {
                 fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
                     match x {
                         #(#getter_enum_ident::#names(x) => {
-                            let (x, len) = <#types as Getter>::hydrate(x, buf)?;
+                            let (x, len) = <#types as RemoteGet>::hydrate(x, buf)?;
                             Ok((#value_enum_ident::#names(x), len))
                         },)*
                         #getter_enum_ident::__None => { unimplemented!() }
@@ -121,7 +139,7 @@ impl Receiver {
 
             #[allow(non_snake_case)]
             impl #impl_generics #value_enum_ident {
-                #(fn #names(self) -> <#types as Getter>::ValueType {
+                #(fn #names(self) -> <#types as RemoteGet>::ValueType {
                     match self {
                         #value_enum_ident::#names(x) => x,
                         _ => unreachable!(),
@@ -142,6 +160,20 @@ impl Receiver {
                         #(#value_enum_ident::#names(inner) => inner.as_float(), )*
                         _ => None,
                     }
+                }
+
+                fn parse_value<T: Sized>(self, x: &str) -> Option<T> {
+                    match &x[..] {
+                        #(s if s.starts_with(#names_string) => {
+                            return match self {
+                                #value_enum_ident::#names(x) => x.parse_value(&s[#names_string.len()..]),
+                                _ => None
+                            }
+                        },)*
+                        _ => {
+                            return None;
+                        }
+                    };
                 }
             }
         })
@@ -234,6 +266,13 @@ impl Receiver {
         let vis = &self.vis;
         let inner_derives = &self.derive;
 
+        let newtype_names_string: Vec<String> = newtype_variants.clone().into_iter().map(|field| {
+            format!("::{}", field)
+        }).collect();
+        let unit_names_string: Vec<String> = unit_variants.clone().into_iter().map(|field| {
+            format!("::{}", field)
+        }).collect();
+
         tokens.extend(quote! {
             #[automatically_derived]
             #[derive(Default, Clone, Hash, PartialEq, Eq, Copy)]
@@ -241,7 +280,7 @@ impl Receiver {
             #[allow(non_camel_case_types)]
             #vis enum #getter_enum_ident {
                 GetVariant,
-                #(#newtype_variants(<#newtype_types as Getter>::GetterType),)*
+                #(#newtype_variants(<#newtype_types as RemoteGet>::GetterType),)*
                 #[default]
                 __None,
             }
@@ -253,23 +292,38 @@ impl Receiver {
                     #getter_enum_ident::GetVariant
                 }
 
-                #(#vis fn #newtype_method_names<F>(&self, func: F) -> Self where F: Fn(<#newtype_types as Getter>::GetterType) -> <#newtype_types as Getter>::GetterType {
-                    #getter_enum_ident::#newtype_variants(func(<#newtype_types as Getter>::GetterType::default()))
+                #(#vis fn #newtype_method_names<F>(&self, func: F) -> Self where F: Fn(<#newtype_types as RemoteGet>::GetterType) -> <#newtype_types as RemoteGet>::GetterType {
+                    #getter_enum_ident::#newtype_variants(func(<#newtype_types as RemoteGet>::GetterType::default()))
                 })*
+            }
+
+            impl Getter for #getter_enum_ident {
+                fn parse_getter(&self, s: &str) -> Option<Self> {
+                    match &s[..] {
+                        "VARIANT" => return Some(#getter_enum_ident::GetVariant),
+                        #(s if s.starts_with(#newtype_names_string) => {
+                            return Some(#getter_enum_ident::#newtype_variants(<#newtype_types as RemoteGet>::GetterType::default().parse_getter(&s[#newtype_names_string.len()..])?));
+                        })*,
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
             }
 
             #[automatically_derived]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
+            #[derive(Copy, Clone)]
             #vis enum #value_enum_ident {
-                #(#newtype_value_variants(<#newtype_types as Getter>::ValueType),)*
+                #(#newtype_value_variants(<#newtype_types as RemoteGet>::ValueType),)*
                 #(#unit_variants,)*
                 #(#newtype_variants,)*
             }
 
             #[automatically_derived]
             #[allow(non_snake_case)]
-            impl #impl_generics Getter for #ident #ty_generics #where_clause {
+            impl #impl_generics RemoteGet for #ident #ty_generics #where_clause {
                 type ValueType = #value_enum_ident #ty_generics;
                 type GetterType = #getter_enum_ident #ty_generics;
 
@@ -294,7 +348,7 @@ impl Receiver {
                 fn hydrate(x: Self::GetterType, buf: &[u8]) -> Result<(Self::ValueType, usize), ()> {
                     match x {
                         #(#getter_enum_ident::#newtype_variants(x) => {
-                            let (x, len) = <#newtype_types as Getter>::hydrate(x, buf)?;
+                            let (x, len) = <#newtype_types as RemoteGet>::hydrate(x, buf)?;
                             Ok((#value_enum_ident::#newtype_value_variants(x), len))
                         },)*
                         _ => { unimplemented!() }
@@ -304,7 +358,7 @@ impl Receiver {
 
             #[allow(non_snake_case)]
             impl #impl_generics #value_enum_ident #ty_generics {
-                #(fn #newtype_variants(self) -> <#newtype_types as Getter>::ValueType {
+                #(fn #newtype_variants(self) -> <#newtype_types as RemoteGet>::ValueType {
                     match self {
                         Self::#newtype_value_variants(x) => x,
                         _ => unreachable!(),
@@ -325,6 +379,20 @@ impl Receiver {
                         #(#value_enum_ident::#newtype_value_variants(inner) => inner.as_float(), )*
                         _ => None,
                     }
+                }
+
+                fn parse_value<T: Sized>(self, x: &str) -> Option<T> {
+                    match &x[..] {
+                        #(s if s.starts_with(#newtype_names_string) => {
+                            return match self {
+                                #value_enum_ident::#newtype_value_variants(x) => x.parse_value(&s[#newtype_names_string.len()..]),
+                                _ => None
+                            }
+                        },)*
+                        _ => {
+                            return None;
+                        }
+                    };
                 }
             }
         })

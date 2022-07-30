@@ -69,26 +69,43 @@ impl Receiver {
         let vis = &self.vis;
         let inner_derives = &self.derive;
 
+        let names_string: Vec<String> = fields.clone().into_iter().map(|field| {
+            format!(".{}", field.ident.unwrap())
+        }).collect();
+
         tokens.extend(quote! {
             #[automatically_derived]
-            #[derive(Default)]
+            #[derive(Default, Copy, Clone)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #setter_enum_ident {
-                #(#names(<#types as Setter>::SetterType),)*
+                #(#names(<#types as RemoteSet>::SetterType),)*
                 #[default]
                 __None,
             }
 
             #[allow(non_snake_case)]
             impl #impl_generics #setter_enum_ident {
-                #(#vis fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as Setter>::SetterType) -> <#types as Setter>::SetterType {
-                    #setter_enum_ident::#names(func(<#types as Setter>::SetterType::default()))
+                #(#vis fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as RemoteSet>::SetterType) -> <#types as RemoteSet>::SetterType {
+                    #setter_enum_ident::#names(func(<#types as RemoteSet>::SetterType::default()))
                 })*
             }
 
+            impl Setter for #setter_enum_ident {
+                fn parse_setter<T: Sized>(&self, x: &str, set: T) -> Option<Self> {
+                    match &x[..] {
+                        #(s if s.starts_with(#names_string) => {
+                            return Some(#setter_enum_ident::#names(<#types as RemoteSet>::SetterType::default().parse_setter(&s[#names_string.len()..], set)?));
+                        })*,
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
+            }
+
             #[allow(non_snake_case)]
-            impl #impl_generics Setter for #ident #ty_generics #where_clause {
+            impl #impl_generics RemoteSet for #ident #ty_generics #where_clause {
                 type SetterType = #setter_enum_ident;
 
                 fn set(&mut self, x: Self::SetterType) -> Result<(), ()> {
@@ -184,6 +201,14 @@ impl Receiver {
             format_ident!("make_{}", field)
         }).collect();
 
+        let newtype_variants_names_string: Vec<String> = newtype_variants.clone().iter().map(|field| {
+            format!("::{}", field)
+        }).collect();
+
+        let unit_variants_names_string: Vec<String> = unit_variants.clone().iter().map(|field| {
+            format!("::{}", field)
+        }).collect();
+
         let newtype_types = self.newtype_types();
 
         let vis = &self.vis;
@@ -191,12 +216,12 @@ impl Receiver {
 
         tokens.extend(quote! {
             #[automatically_derived]
-            #[derive(Default)]
+            #[derive(Default, Copy, Clone)]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
             #vis enum #setter_enum_ident #ty_generics {
                 #(#unit_variants,)*
-                #(#newtype_variants(<#newtype_types as Setter>::SetterType),)*
+                #(#newtype_variants(<#newtype_types as RemoteSet>::SetterType),)*
                 #[default]
                 __None,
             }
@@ -208,13 +233,30 @@ impl Receiver {
                 })*
 
                 #(#vis fn #newtype_variant_method_names<F>(&self, func: F) -> Self
-                    where F: Fn(<#newtype_types as Setter>::SetterType) -> <#newtype_types as Setter>::SetterType {
-                        #setter_enum_ident::#newtype_variants(func(<#newtype_types as Setter>::SetterType::default()))
+                    where F: Fn(<#newtype_types as RemoteSet>::SetterType) -> <#newtype_types as RemoteSet>::SetterType {
+                        #setter_enum_ident::#newtype_variants(func(<#newtype_types as RemoteSet>::SetterType::default()))
                 })*
             }
 
+            impl Setter for #setter_enum_ident {
+                fn parse_setter<T: Sized>(&self, x: &str, set: T) -> Option<Self> {
+                    match &x[..] {
+                        #(s if s.starts_with(#newtype_variants_names_string) => {
+                            return Some(#setter_enum_ident::#newtype_variants(<#newtype_types as RemoteSet>::SetterType::default().parse_setter(&s[#newtype_variants_names_string.len()..], set)?));
+                        },)*
+                        #(#unit_variants_names_string => {
+                            assert_eq!(core::mem::size_of::<T>(), 0);
+                            return Some(#setter_enum_ident::#unit_variants);
+                        },)*
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
+            }
+
             #[allow(non_snake_case)]
-            impl #impl_generics Setter for #ident #ty_generics #where_clause {
+            impl #impl_generics RemoteSet for #ident #ty_generics #where_clause {
                 type SetterType = #setter_enum_ident #ty_generics;
 
                 fn set(&mut self, x: Self::SetterType)  -> Result<(), ()>{

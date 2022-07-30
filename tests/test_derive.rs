@@ -85,7 +85,7 @@ fn test_derive() {
     // enum get variant
     let v = config.get(getter!(Config.e.var)).unwrap();
     match v.e() {
-        <TestEnum as Getter>::ValueType::A => {},
+        <TestEnum as RemoteGet>::ValueType::A => {},
         _ => unreachable!(),
     }
 

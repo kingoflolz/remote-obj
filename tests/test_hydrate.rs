@@ -36,7 +36,7 @@ fn test_hydrate() {
     assert_eq!(raw_v, 1);
 
     let g = getter!(NestedTest.a.a);
-    let (rehydrated_v, length) = <NestedTest as Getter>::hydrate(g, &buf).unwrap();
+    let (rehydrated_v, length) = <NestedTest as RemoteGet>::hydrate(g, &buf).unwrap();
     assert_eq!(length, 1);
     assert_eq!(rehydrated_v.a().a(), 1);
 }
