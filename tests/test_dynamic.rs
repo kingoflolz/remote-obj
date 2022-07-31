@@ -37,12 +37,6 @@ fn test_dynamic() {
         d: [0; 8]
     };
 
-    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(""));
-    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".c"));
-    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".c::B"));
-    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".c::B.a"));
-    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".d[2]"));
-
     let path = ".a";
     let x = 1;
     let setter = Test::dynamic_setter::<i8>(path, x).unwrap();
@@ -91,4 +85,10 @@ fn test_dynamic() {
     assert_eq!(format!("{}", getter), path.to_string());
     let value = test.get(getter).unwrap();
     assert_eq!(value.parse_value::<i8>(path).unwrap(), x);
+
+    assert_eq!(Some(FieldsType::Fields(&[".a", ".b", ".c", ".d"])), <Test as RemoteGet>::GetterType::get_fields(""));
+    assert_eq!(Some(FieldsType::Fields(&["::B", "VARIANT"])), <Test as RemoteGet>::GetterType::get_fields(".c"));
+    assert_eq!(Some(FieldsType::Fields(&[".a", ".b"])), <Test as RemoteGet>::GetterType::get_fields(".c::B"));
+    assert_eq!(Some(FieldsType::Terminal), <Test as RemoteGet>::GetterType::get_fields(".c::B.a"));
+    assert_eq!(Some(FieldsType::Arr(8)), <Test as RemoteGet>::GetterType::get_fields(".d"));
 }

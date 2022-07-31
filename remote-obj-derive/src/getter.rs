@@ -110,9 +110,9 @@ impl Receiver {
                     };
                 }
 
-                fn get_fields(s: &str) -> Option<&'static [&'static str]> {
+                fn get_fields(s: &str) -> Option<FieldsType> {
                     match &s[..] {
-                        "" => return Some(&Self::GETTER_CASES),
+                        "" => return Some(FieldsType::Fields(&Self::GETTER_CASES)),
                         #(s if s.starts_with(#names_string) => {
                             return <#types as RemoteGet>::GetterType::get_fields(&s[#names_string.len()..]);
                         })*,
@@ -346,9 +346,9 @@ impl Receiver {
                     };
                 }
 
-                fn get_fields(s: &str) -> Option<&'static [&'static str]> {
+                fn get_fields(s: &str) -> Option<FieldsType> {
                     match &s[..] {
-                        "" => return Some(&Self::GETTER_CASES),
+                        "" => return Some(FieldsType::Fields(&Self::GETTER_CASES)),
                         #(s if s.starts_with(#newtype_names_string) => {
                             return <#newtype_types as RemoteGet>::GetterType::get_fields(&s[#newtype_names_string.len()..]);
                         })*,

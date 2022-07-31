@@ -7,12 +7,20 @@ use core::mem::size_of;
 use core::ops::Index;
 pub use remote_obj_derive::{RemoteSetter, RemoteGetter, setter, getter};
 use bincode::{Encode, Decode};
+use crate::FieldsType::Terminal;
 
 pub mod prelude {
     pub use crate::{
-        RemoteSetter, RemoteGetter, setter, getter, Setter, Getter, Value, RemoteSet, RemoteGet, NullGetter
+        RemoteSetter, RemoteGetter, setter, getter, Setter, Getter, Value, RemoteSet, RemoteGet, NullGetter, FieldsType
     };
     pub use core::any::Any;
+}
+
+#[derive(Hash, Eq, Clone, Copy, PartialEq, Debug)]
+pub enum FieldsType {
+    Fields(&'static [&'static str]),
+    Arr(usize),
+    Terminal
 }
 
 pub trait Value: Sized + Copy {
@@ -60,9 +68,9 @@ pub trait Getter: Default + Hash + Eq + Clone + Copy + Display {
         }
     }
 
-    fn get_fields(x: &str) -> Option<&'static [&'static str]> {
+    fn get_fields(x: &str) -> Option<FieldsType> {
         if x.is_empty() {
-            Some(&[])
+            Some(FieldsType::Terminal)
         } else {
             None
         }
@@ -171,14 +179,27 @@ impl_num_primitive!(f32);
 impl_num_primitive!(f64);
 
 #[derive(Debug, Encode, Decode, Clone, Hash, PartialEq, Eq, Copy)]
-pub struct ArrHelper<T> where T: Copy {
+pub struct ArrHelper<T, const N: usize> where T: Copy {
     r: T,
     idx: usize,
 }
 
+impl <T, const N: usize> ArrHelper<T, N> where T: Copy {
+    pub fn new(r: T, idx: usize) -> Self {
+        ArrHelper {
+            r,
+            idx,
+        }
+    }
+
+    const fn length() -> usize {
+        N
+    }
+}
+
 impl<T, const N: usize> RemoteSet for [T; N] where T: RemoteSet,
 {
-    type SetterType = ArrHelper<T::SetterType>;
+    type SetterType = ArrHelper<T::SetterType, N>;
 
     fn set(&mut self, x: Self::SetterType) -> Result<(), ()> {
         match self.get_mut(x.idx) {
@@ -191,7 +212,7 @@ impl<T, const N: usize> RemoteSet for [T; N] where T: RemoteSet,
     }
 }
 
-impl<T: Copy + Default> Default for ArrHelper<T> {
+impl<T: Copy + Default, const N: usize> Default for ArrHelper<T, N> {
     fn default() -> Self {
         ArrHelper {
             r: T::default(),
@@ -200,13 +221,13 @@ impl<T: Copy + Default> Default for ArrHelper<T> {
     }
 }
 
-impl<T: Copy + Default + Display> Display for ArrHelper<T> {
+impl<T: Copy + Default + Display, const N: usize> Display for ArrHelper<T, N> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "[{}]{}", self.idx, self.r)
     }
 }
 
-impl<T: Copy + Default + Setter> Setter for ArrHelper<T> {
+impl<T: Copy + Default + Setter, const N: usize> Setter for ArrHelper<T, N> {
     fn parse_setter<I: Sized>(&self, x: &str, set: I) -> Option<Self> {
         let l_bracket = x.find('[')?;
         let r_bracket = x.find(']')?;
@@ -220,8 +241,8 @@ impl<T: Copy + Default + Setter> Setter for ArrHelper<T> {
 
 impl<T, const N: usize> RemoteGet for [T; N] where T: RemoteGet,
 {
-    type ValueType = ArrHelper<T::ValueType>;
-    type GetterType = ArrHelper<T::GetterType>;
+    type ValueType = ArrHelper<T::ValueType, N>;
+    type GetterType = ArrHelper<T::GetterType, N>;
 
     fn get(&self, x: Self::GetterType) -> Result<Self::ValueType, ()> {
         self[x.idx].get(x.r).map(|v| ArrHelper {
@@ -238,7 +259,7 @@ impl<T, const N: usize> RemoteGet for [T; N] where T: RemoteGet,
     }
 }
 
-impl<T: Copy + Value> Value for ArrHelper<T> {
+impl<T: Copy + Value, const N: usize> Value for ArrHelper<T, N> {
     fn dehydrate(&self, x: &mut [u8]) -> Option<usize> {
         self.r.dehydrate(x)
     }
@@ -259,7 +280,7 @@ impl<T: Copy + Value> Value for ArrHelper<T> {
     }
 }
 
-impl<T: Copy + Default + Getter> Getter for ArrHelper<T> {
+impl<T: Copy + Default + Getter, const N: usize> Getter for ArrHelper<T, N> {
     fn parse_getter(x: &str) -> Option<Self> {
         let l_bracket = x.find('[')?;
         let r_bracket = x.find(']')?;
@@ -270,19 +291,24 @@ impl<T: Copy + Default + Getter> Getter for ArrHelper<T> {
         })
     }
 
-    fn get_fields(x: &str) -> Option<&'static [&'static str]> {
+    fn get_fields(x: &str) -> Option<FieldsType> {
         if x.is_empty() {
-            return Some(&["[]"])
+            return Some(FieldsType::Arr(N))
         }
         let l_bracket = x.find('[')?;
         let r_bracket = x.find(']')?;
         let idx = x[l_bracket + 1..r_bracket].parse::<usize>().ok()?;
-        T::get_fields(&x[r_bracket + 1..])
+
+        if idx >= N {
+            return None;
+        } else {
+            T::get_fields(&x[r_bracket + 1..])
+        }
     }
 }
 
 
-impl<T: Copy> Index<usize> for ArrHelper<T> {
+impl<T: Copy, const N: usize> Index<usize> for ArrHelper<T, N> {
     type Output = T;
 
     fn index(&self, index: usize) -> &Self::Output {
@@ -291,20 +317,14 @@ impl<T: Copy> Index<usize> for ArrHelper<T> {
     }
 }
 
-impl<T: Getter> ArrHelper<T> {
+impl<T: Getter, const N: usize> ArrHelper<T, N> {
     pub fn arr_get<F>(self, idx: usize, func: F) -> Self where F: Fn(T) -> T {
-        ArrHelper {
-            r: func(T::default()),
-            idx
-        }
+        ArrHelper::new(func(T::default()), idx)
     }
 }
 
-impl<T: Setter> ArrHelper<T> {
+impl<T: Setter, const N: usize> ArrHelper<T, N> {
     pub fn arr_set<F>(self, idx: usize, func: F) -> Self where F: Fn(T) -> T {
-        ArrHelper {
-            r: func(T::default()),
-            idx
-        }
+        ArrHelper::new(func(T::default()), idx)
     }
 }
