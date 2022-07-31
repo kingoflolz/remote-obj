@@ -37,6 +37,12 @@ fn test_dynamic() {
         d: [0; 8]
     };
 
+    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(""));
+    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".c"));
+    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".c::B"));
+    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".c::B.a"));
+    println!("{:?}", <Test as RemoteGet>::GetterType::get_fields(".d[2]"));
+
     let path = ".a";
     let x = 1;
     let setter = Test::dynamic_setter::<i8>(path, x).unwrap();

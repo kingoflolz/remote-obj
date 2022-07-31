@@ -52,9 +52,17 @@ pub trait RemoteSet {
 }
 
 pub trait Getter: Default + Hash + Eq + Clone + Copy + Display {
-    fn parse_getter(&self, x: &str) -> Option<Self> {
+    fn parse_getter(x: &str) -> Option<Self> {
         if x.is_empty() {
             Some(Self::default())
+        } else {
+            None
+        }
+    }
+
+    fn get_fields(x: &str) -> Option<&'static [&'static str]> {
+        if x.is_empty() {
+            Some(&[])
         } else {
             None
         }
@@ -71,7 +79,7 @@ pub trait RemoteGet {
 
     fn dynamic_getter(x: &str) -> Option<Self::GetterType>
     {
-        Self::GetterType::parse_getter(&Self::GetterType::default(), x)
+        Self::GetterType::parse_getter(x)
     }
 }
 
@@ -252,14 +260,24 @@ impl<T: Copy + Value> Value for ArrHelper<T> {
 }
 
 impl<T: Copy + Default + Getter> Getter for ArrHelper<T> {
-    fn parse_getter(&self, x: &str) -> Option<Self> {
+    fn parse_getter(x: &str) -> Option<Self> {
         let l_bracket = x.find('[')?;
         let r_bracket = x.find(']')?;
         let idx = x[l_bracket + 1..r_bracket].parse::<usize>().ok()?;
         Some(ArrHelper {
-            r: T::default().parse_getter(&x[r_bracket + 1..])?,
+            r: T::parse_getter(&x[r_bracket + 1..])?,
             idx,
         })
+    }
+
+    fn get_fields(x: &str) -> Option<&'static [&'static str]> {
+        if x.is_empty() {
+            return Some(&["[]"])
+        }
+        let l_bracket = x.find('[')?;
+        let r_bracket = x.find(']')?;
+        let idx = x[l_bracket + 1..r_bracket].parse::<usize>().ok()?;
+        T::get_fields(&x[r_bracket + 1..])
     }
 }
 

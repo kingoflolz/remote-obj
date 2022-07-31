@@ -70,6 +70,8 @@ impl Receiver {
             format!(".{}", field.ident.unwrap())
         }).collect();
 
+        let variants_len = names_string.len();
+
         let vis = &self.vis;
         let inner_derives = &self.derive;
 
@@ -90,13 +92,29 @@ impl Receiver {
                 #(#vis fn #method_names<F>(&self, func: F) -> Self where F: Fn(<#types as RemoteGet>::GetterType) -> <#types as RemoteGet>::GetterType {
                     #getter_enum_ident::#names(func(<#types as RemoteGet>::GetterType::default()))
                 })*
+
+                const GETTER_CASES: [&'static str; #variants_len] = [
+                    #(#names_string,)*
+                ];
             }
 
             impl Getter for #getter_enum_ident {
-                fn parse_getter(&self, s: &str) -> Option<Self> {
+                fn parse_getter(s: &str) -> Option<Self> {
                     match &s[..] {
                         #(s if s.starts_with(#names_string) => {
-                            return Some(#getter_enum_ident::#names(<#types as RemoteGet>::GetterType::default().parse_getter(&s[#names_string.len()..])?));
+                            return Some(#getter_enum_ident::#names(<#types as RemoteGet>::GetterType::parse_getter(&s[#names_string.len()..])?));
+                        })*,
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
+
+                fn get_fields(s: &str) -> Option<&'static [&'static str]> {
+                    match &s[..] {
+                        "" => return Some(&Self::GETTER_CASES),
+                        #(s if s.starts_with(#names_string) => {
+                            return <#types as RemoteGet>::GetterType::get_fields(&s[#names_string.len()..]);
                         })*,
                         _ => {
                             return None;
@@ -284,6 +302,8 @@ impl Receiver {
             format!("::{}", field)
         }).collect();
 
+        let variants_len = newtype_variants.len() + 1;
+
         tokens.extend(quote! {
             #[automatically_derived]
             #[derive(Default, Clone, Hash, PartialEq, Eq, Copy)]
@@ -306,14 +326,31 @@ impl Receiver {
                 #(#vis fn #newtype_method_names<F>(&self, func: F) -> Self where F: Fn(<#newtype_types as RemoteGet>::GetterType) -> <#newtype_types as RemoteGet>::GetterType {
                     #getter_enum_ident::#newtype_variants(func(<#newtype_types as RemoteGet>::GetterType::default()))
                 })*
+
+                const GETTER_CASES: [&'static str; #variants_len] = [
+                    #(#newtype_names_string,)*
+                    "VARIANT"
+                ];
             }
 
             impl Getter for #getter_enum_ident {
-                fn parse_getter(&self, s: &str) -> Option<Self> {
+                fn parse_getter(s: &str) -> Option<Self> {
                     match &s[..] {
                         "VARIANT" => return Some(#getter_enum_ident::GetVariant),
                         #(s if s.starts_with(#newtype_names_string) => {
-                            return Some(#getter_enum_ident::#newtype_variants(<#newtype_types as RemoteGet>::GetterType::default().parse_getter(&s[#newtype_names_string.len()..])?));
+                            return Some(#getter_enum_ident::#newtype_variants(<#newtype_types as RemoteGet>::GetterType::parse_getter(&s[#newtype_names_string.len()..])?));
+                        })*,
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
+
+                fn get_fields(s: &str) -> Option<&'static [&'static str]> {
+                    match &s[..] {
+                        "" => return Some(&Self::GETTER_CASES),
+                        #(s if s.starts_with(#newtype_names_string) => {
+                            return <#newtype_types as RemoteGet>::GetterType::get_fields(&s[#newtype_names_string.len()..]);
                         })*,
                         _ => {
                             return None;
