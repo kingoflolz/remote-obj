@@ -7,7 +7,6 @@ use core::mem::size_of;
 use core::ops::Index;
 pub use remote_obj_derive::{RemoteSetter, RemoteGetter, setter, getter};
 use bincode::{Encode, Decode};
-use crate::FieldsType::Terminal;
 
 pub mod prelude {
     pub use crate::{
@@ -47,6 +46,8 @@ pub trait Setter: Default + Sized + Copy + Display {
             None
         }
     }
+
+    fn parse_setter_numeric(&self, x: &str, set: f64) -> Option<Self>;
 }
 
 pub trait RemoteSet {
@@ -56,6 +57,10 @@ pub trait RemoteSet {
     fn dynamic_setter<T>(x: &str, set: T) -> Option<Self::SetterType>
     {
         Self::SetterType::parse_setter::<T>(&Self::SetterType::default(), x, set)
+    }
+    fn dynamic_setter_numeric(x: &str, set: f64) -> Option<Self::SetterType>
+    {
+        Self::SetterType::parse_setter_numeric(&Self::SetterType::default(), x, set)
     }
 }
 
@@ -109,7 +114,11 @@ impl Display for NullSetter {
     }
 }
 
-impl Setter for NullSetter {}
+impl Setter for NullSetter {
+    fn parse_setter_numeric(&self, x: &str, set: f64) -> Option<Self> {
+        None
+    }
+}
 
 impl Display for NullGetter {
     fn fmt(&self, _: &mut Formatter<'_>) -> fmt::Result {
@@ -161,7 +170,15 @@ macro_rules! impl_num_primitive {
             }
         }
 
-        impl Setter for $t {}
+        impl Setter for $t {
+            fn parse_setter_numeric(&self, x: &str, set: f64) -> Option<Self> {
+                if x.is_empty() {
+                    Some(set as Self)
+                } else {
+                    None
+                }
+            }
+        }
     }
 }
 
@@ -190,10 +207,6 @@ impl <T, const N: usize> ArrHelper<T, N> where T: Copy {
             r,
             idx,
         }
-    }
-
-    const fn length() -> usize {
-        N
     }
 }
 
@@ -234,6 +247,16 @@ impl<T: Copy + Default + Setter, const N: usize> Setter for ArrHelper<T, N> {
         let idx = x[l_bracket + 1..r_bracket].parse::<usize>().ok()?;
         Some(ArrHelper {
             r: T::default().parse_setter(&x[r_bracket + 1..], set)?,
+            idx,
+        })
+    }
+
+    fn parse_setter_numeric(&self, x: &str, set: f64) -> Option<Self> {
+        let l_bracket = x.find('[')?;
+        let r_bracket = x.find(']')?;
+        let idx = x[l_bracket + 1..r_bracket].parse::<usize>().ok()?;
+        Some(ArrHelper {
+            r: T::default().parse_setter_numeric(&x[r_bracket + 1..], set)?,
             idx,
         })
     }

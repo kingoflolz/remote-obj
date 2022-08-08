@@ -39,7 +39,7 @@ fn test_dynamic() {
 
     let path = ".a";
     let x = 1;
-    let setter = Test::dynamic_setter::<i8>(path, x).unwrap();
+    let setter = Test::dynamic_setter_numeric(path, x as f64).unwrap();
     assert_eq!(format!("{}", path), path.to_string());
     test.set(setter).unwrap();
     let getter = Test::dynamic_getter(path).unwrap();

@@ -140,7 +140,7 @@ impl Receiver {
             #[automatically_derived]
             #[allow(non_camel_case_types)]
             #[derive(#(#inner_derives),*)]
-            #[derive(Copy, Clone)]
+            #[derive(Copy, Clone, PartialEq)]
             #vis enum #value_enum_ident {
                 #(#names(<#types as RemoteGet>::ValueType)),*
             }
@@ -380,7 +380,7 @@ impl Receiver {
             #[automatically_derived]
             #[derive(#(#inner_derives),*)]
             #[allow(non_camel_case_types)]
-            #[derive(Copy, Clone)]
+            #[derive(Copy, Clone, PartialEq)]
             #vis enum #value_enum_ident {
                 #(#newtype_value_variants(<#newtype_types as RemoteGet>::ValueType),)*
                 #(#unit_variants,)*

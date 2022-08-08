@@ -102,6 +102,17 @@ impl Receiver {
                         }
                     };
                 }
+
+                fn parse_setter_numeric(&self, x: &str, set: f64) -> Option<Self> {
+                    match &x[..] {
+                        #(s if s.starts_with(#names_string) => {
+                            return Some(#setter_enum_ident::#names(<#types as RemoteSet>::SetterType::default().parse_setter_numeric(&s[#names_string.len()..], set)?));
+                        })*,
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
             }
 
             impl core::fmt::Display for #setter_enum_ident {
@@ -262,6 +273,17 @@ impl Receiver {
                         #(#unit_variants_names_string => {
                             assert_eq!(core::mem::size_of::<T>(), 0);
                             return Some(#setter_enum_ident::#unit_variants);
+                        },)*
+                        _ => {
+                            return None;
+                        }
+                    };
+                }
+
+                fn parse_setter_numeric(&self, x: &str, set: f64) -> Option<Self> {
+                    match &x[..] {
+                        #(s if s.starts_with(#newtype_variants_names_string) => {
+                            return Some(#setter_enum_ident::#newtype_variants(<#newtype_types as RemoteSet>::SetterType::default().parse_setter_numeric(&s[#newtype_variants_names_string.len()..], set)?));
                         },)*
                         _ => {
                             return None;
