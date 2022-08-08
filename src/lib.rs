@@ -115,7 +115,7 @@ impl Display for NullSetter {
 }
 
 impl Setter for NullSetter {
-    fn parse_setter_numeric(&self, x: &str, set: f64) -> Option<Self> {
+    fn parse_setter_numeric(&self, _x: &str, _set: f64) -> Option<Self> {
         None
     }
 }
